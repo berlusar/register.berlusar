@@ -41,139 +41,110 @@ function encryptData(data, keyBase64) {
     return iv.toString('base64') + ':' + encrypted;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function decryptPayload(payload, keyBase64) {
-    try {
-        const parts = payload.split(':');
-        const iv = Buffer.from(parts[0], 'base64');
-        const encrypted = parts[1];
-        const key = Buffer.from(keyBase64, 'base64');
-        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-        let decrypted = decipher.update(encrypted, 'base64', 'utf8');
-        decrypted += decipher.final('utf8');
-        return JSON.parse(decrypted);
-    } catch (e) {
-        console.error('[DECRYPT ERROR]', e.message);
-        throw e;
-    }
+    const parts = payload.split(':');
+    const iv = Buffer.from(parts[0], 'base64');
+    const encrypted = parts[1];
+    const key = Buffer.from(keyBase64, 'base64');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    let decrypted = decipher.update(encrypted, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    return JSON.parse(decrypted);
 }
 
 function encryptResponse(dataObj, keyBase64) {
-    try {
-        const iv = crypto.randomBytes(16);
-        const key = Buffer.from(keyBase64, 'base64');
-        const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-        let encrypted = cipher.update(JSON.stringify(dataObj), 'utf8', 'base64');
-        encrypted += cipher.final('base64');
-        return { encrypted: true, payload: iv.toString('base64') + ':' + encrypted };
-    } catch (e) {
-        console.error('[ENCRYPT ERROR]', e.message);
-        return { encrypted: false, ...dataObj };
-    }
+    return { encrypted: true, payload: encryptData(JSON.stringify(dataObj), keyBase64) };
 }
 
-async function generateUniqueUid() {
-    let attempts = 0;
-    while (attempts < 5) {
-        const uid = Math.floor(10000000 + Math.random() * 90000000).toString();
-        const { data } = await supabase.from('users').select('uid').eq('uid', uid).maybeSingle();
-        if (!data) return uid;
-        attempts++;
-    }
-    return Date.now().toString().slice(-8); // Final fallback
-}
-
-// ─── Endpoints ───────────────────────────────────────────────────────────────
-
-// Standard Session Init for Web
+// API Routes
 app.post('/api/session/init', Ze(async (req, res) => {
+    if (!supabase) {
+        return res.status(500).json({ error: 'Database connection not configured' });
+    }
+
     const { fingerprint, action } = req.body;
     const sessionId = crypto.randomUUID();
     const key = crypto.randomBytes(32).toString('base64');
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes (user requested)
 
-    if (!supabase) {
-        console.warn('[SESSION] No Supabase client, using local session');
-        return res.json({ session_id: sessionId, key: key, _local: true });
-    }
+    const { error } = await supabase.from('sessions').insert([{
+        id: sessionId,
+        key: key,
+        fingerprint: fingerprint || 'unknown',
+        action: action || 'register_page',
+        expires_at: expiresAt.toISOString()
+    }]);
 
-    try {
-        const { error } = await supabase.from('sessions').insert([{
-            id: sessionId,
-            key: key,
-            fingerprint: fingerprint || 'unknown',
-            action: action || 'register_page',
-            expires_at: expiresAt.toISOString()
-        }]);
-
-        if (error) {
-            console.error('[SESSION DB ERROR]', error.message);
-            // Fallback to local session
-            return res.json({ session_id: sessionId, key: key, _local: true, warning: 'db_error' });
-        }
-    } catch (err) {
-        console.error('[SESSION FATAL ERROR]', err.message);
-        return res.json({ session_id: sessionId, key: key, _local: true });
+    if (error) {
+        console.error('[SESSION ERROR]', error);
+        return res.status(500).json({ 
+            error: 'Database error', 
+            message: error.message,
+            code: error.code,
+            details: error.details
+        });
     }
 
     res.json({ session_id: sessionId, key: key });
 }));
 
-// Web Register (Encrypted)
 app.post('/api/register', Ze(async (req, res) => {
     const sessionId = req.headers['x-session-id'];
     const encryptedPayload = req.body.payload;
 
-    if (!sessionId) return res.status(401).json({ error: 'Session ID missing' });
+    if (!sessionId) return res.status(401).json({ success: false, message: 'Session ID required' });
+    if (!supabase) return res.status(500).json({ success: false, message: 'Database not available' });
 
-    // Fetch session
-    let sessionKey = null;
-    if (supabase) {
-        const { data: session, error: sessionError } = await supabase
-            .from('sessions')
-            .select('key')
-            .eq('id', sessionId)
-            .gt('expires_at', new Date().toISOString())
-            .maybeSingle();
-        
-        if (session) sessionKey = session.key;
+    // Get session from Supabase
+    const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+    if (sessionError || !session) {
+        return res.status(401).json({ success: false, message: 'Invalid or expired session' });
     }
 
-    if (!sessionKey) return res.status(401).json({ error: 'Session expired or invalid. Please reload.' });
+    let data;
+    try {
+        data = decryptPayload(encryptedPayload, session.key);
+    } catch (e) {
+        return res.status(400).json({ success: false, message: 'Security failure' });
+    }
+
+    const { username, password, key: accessKey, fingerprint } = data;
+
+    // Optional: fingerprint validation
+    if (fingerprint && session.fingerprint && fingerprint !== session.fingerprint) {
+        console.warn(`[SECURITY] Fingerprint mismatch for session ${sessionId}`);
+    }
 
     try {
-        const { username, password, key } = decryptPayload(encryptedPayload, sessionKey);
-
-        if (!username || !password || !key) {
-            return res.json(encryptResponse({ success: false, error: 'All fields are required' }, sessionKey));
-        }
-
-        // Validate Access Key
-        const { data: accessKey, error: keyError } = await supabase
+        const { data: keyData, error: keyError } = await supabase
             .from('access_keys')
             .select('*')
-            .eq('key_value', key)
+            .eq('key_value', accessKey)
             .eq('status', 'active')
-            .is('user_id', null)
-            .maybeSingle();
+            .single();
 
-        if (keyError || !accessKey) {
-            return res.json(encryptResponse({ success: false, error: 'Invalid or already used key' }, sessionKey));
+        if (keyError || !keyData) {
+            return res.status(400).json(encryptResponse({ success: false, message: 'Invalid or already used access key' }, session.key));
         }
 
-        // Check if username exists
-        const { data: existingUser } = await supabase
+        const { data: userExist } = await supabase
             .from('users')
             .select('id')
             .eq('username', username)
             .maybeSingle();
 
-        if (existingUser) {
-            return res.json(encryptResponse({ success: false, error: 'Username already taken' }, sessionKey));
+        if (userExist) {
+            return res.status(400).json(encryptResponse({ success: false, message: 'Username is already taken' }, session.key));
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const generatedUid = await generateUniqueUid();
+        const generatedUid = Math.floor(10000000 + Math.random() * 90000000).toString();
 
         const { data: newUser, error: createUserError } = await supabase
             .from('users')
@@ -182,39 +153,37 @@ app.post('/api/register', Ze(async (req, res) => {
             .single();
 
         if (createUserError || !newUser) {
-            console.error('[REG ERROR] User creation failed:', createUserError);
-            return res.json(encryptResponse({ error: 'Registration failed. Try again.' }, sessionKey));
+            console.error('[DB ERROR] User creation failed:', createUserError);
+            throw new Error('Failed to create account');
         }
 
-        // Mark key as used
-        await supabase
-            .from('access_keys')
-            .update({ status: 'used', user_id: newUser.id })
-            .eq('id', accessKey.id);
+        // Update key status
+        await supabase.from('access_keys').update({ status: 'used', user_id: newUser.id }).eq('id', keyData.id);
+        
+        // Delete session after use
+        await supabase.from('sessions').delete().eq('id', sessionId);
 
-        res.json(encryptResponse({ success: true, message: 'Account created successfully!', uid: generatedUid }, sessionKey));
-
-    } catch (e) {
-        console.error('[REG ERROR]', e);
-        res.status(400).json({ error: 'Security verification failed' });
+        res.json(encryptResponse({ success: true, uid: generatedUid }, session.key));
+    } catch (error) {
+        console.error('[REGISTRATION ERROR]', error);
+        res.status(500).json({ success: false, message: error.message || 'Internal server error' });
     }
 }));
 
-// Health Check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', supabase: !!supabase, time: new Date().toISOString() });
-});
-
-// Static Files
+// Serve Static Files
 app.use(express.static(path.join(__dirname, '..')));
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
-// Error Handler
+// Error Handling
 app.use((err, req, res, next) => {
-    console.error('[GLOBAL ERROR]', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('[REGISTER API ERROR]', err);
+    res.status(500).json({ 
+        success: false, 
+        message: 'Internal Server Error', 
+        details: err.message 
+    });
 });
 
 module.exports = app;
