@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Berlusar Server - Register</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+    <script src="js/crypto-js.min.js"></script>
+    <script src="js/api.js" async="" defer=""></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #003A8F 0%, #002B6B 100%);
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 0;
+        }
+
+        /* HEADER WITH DISCLAIMER AND LANGUAGE */
+        .header-bar {
+            width: 100%;
+            background: linear-gradient(90deg, #2a2a2a 0%, #1f1f1f 50%, #2a2a2a 100%);
+            border-bottom: 1px solid rgba(255, 102, 0, 0.3);
+            padding: 8px 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* LANGUAGE SWITCHER */
+        .lang-switcher {
+            display: flex;
+            gap: 5px;
+            z-index: 100;
+        }
+
+        /* DISCLAIMER BANNER */
+        .disclaimer-banner {
+            text-align: center;
+        }
+
+        .disclaimer-banner p {
+            color: #999;
+            font-size: 10px;
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .disclaimer-banner strong {
+            color: #FFFFFF;
+        }
+
+        .lang-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #888;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            cursor: pointer;
+            font-family: 'Roboto', sans-serif;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .lang-btn:hover {
+            background: rgba(0, 60, 140, 0.2);
+            border-color: rgba(0, 60, 140, 0.4);
+            color: #0056B3;
+        }
+
+        .lang-btn.active {
+            background: linear-gradient(135deg, #005CBF, #004AA6);
+            border-color: #003A8F;
+            color: #000;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            width: 100%;
+        }
+
+        .register-container {
+            background: linear-gradient(145deg, #1f1f1f 0%, #141414 100%);
+            border-radius: 10px;
+            padding: 20px 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            max-width: 340px;
+            width: 100%;
+            border: 1px solid rgba(255, 102, 0, 0.2);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .logo img {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            margin-bottom: 10px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .logo h1 {
+            font-family: 'Roboto', sans-serif;
+            color: #003A8F;
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #ccc;
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+            border-radius: 5px;
+            font-size: 13px;
+            color: #fff;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #003A8F;
+            background: rgba(255, 102, 0, 0.05);
+        }
+
+        .btn-register {
+            width: 100%;
+            padding: 11px;
+            background: linear-gradient(135deg, #0056B3, #007BFF);
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            margin-top: 6px;
+            text-transform: uppercase;
+        }
+
+        .btn-register:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: rgba(198, 40, 40, 0.15);
+            color: #ff6b6b;
+            padding: 8px 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 11px;
+            display: none;
+            text-align: center;
+        }
+
+        .success-message {
+            background: rgba(46, 125, 50, 0.15);
+            color: #69f0ae;
+            padding: 8px 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 11px;
+            display: none;
+        }
+
+        .info-box {
+            background: rgba(255, 102, 0, 0.1);
+            color: #ffb366;
+            padding: 8px 10px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .info-box strong {
+            color: #007BFF;
+        }
+
+        .captcha-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 14px 0 10px 0;
+            min-height: 78px;
+        }
+
+        .captcha-container .h-captcha {
+            transform: scale(0.85);
+            transform-origin: center center;
+        }
+
+        .reload-hint {
+            color: #888;
+            font-size: 10px;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 9px;
+            color: #666;
+        }
+
+        .footer-text a {
+            color: #0056B3;
+            text-decoration: none;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            color: #007BFF;
+            font-size: 14px;
+        }
+
+        .cookie-banner {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(145deg, #2a2a2a 0%, #1a1a1a 100%);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            border-top: 1px solid rgba(255, 102, 0, 0.3);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .cookie-banner.hidden {
+            display: none;
+        }
+
+        .cookie-banner p {
+            color: #ccc;
+            font-size: 11px;
+            margin: 0;
+            flex: 1;
+        }
+
+        .cookie-banner button {
+            background: linear-gradient(135deg, #0056B3, #007BFF);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 10px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+        }
+
+        .form-blocked {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* POPUP DE TERMOS */
+        .terms-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .terms-overlay.hidden {
+            display: none;
+        }
+
+        .terms-popup {
+            background: linear-gradient(145deg, #1f1f1f 0%, #141414 100%);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 400px;
+            width: 100%;
+            border: 1px solid rgba(255, 102, 0, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        .terms-popup h2 {
+            font-family: 'Orbitron', sans-serif;
+            color: #0056B3;
+            font-size: 14px;
+            margin-bottom: 16px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .terms-popup .disclaimer {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid rgba(220, 53, 69, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .terms-popup .disclaimer p {
+            color: #ff8a8a;
+            font-size: 11px;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .terms-popup .disclaimer strong {
+            color: #ff6b6b;
+        }
+
+        .terms-popup .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+        }
+
+        .terms-popup .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+            accent-color: #0056B3;
+            cursor: pointer;
+        }
+
+        .terms-popup .checkbox-group label {
+            color: #ccc;
+            font-size: 11px;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+
+        .terms-popup .checkbox-group label a {
+            color: #0056B3;
+            text-decoration: none;
+        }
+
+        .terms-popup .checkbox-group label a:hover {
+            text-decoration: underline;
+        }
+
+        .terms-popup .buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .terms-popup .btn-accept {
+            flex: 1;
+            padding: 10px;
+            background: linear-gradient(135deg, #0056B3, #007BFF);
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .terms-popup .btn-accept:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .terms-popup .btn-decline {
+            flex: 1;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #999;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: 'Roboto', sans-serif;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .terms-popup .btn-decline:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Toast Notification System */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 11000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(26, 26, 26, 0.95);
+            border-left: 4px solid #0056B3;
+            color: #eee;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            min-width: 280px;
+            max-width: 400px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateX(120%);
+            transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            pointer-events: auto;
+        }
+
+        .toast.active {
+            transform: translateX(0);
+        }
+
+        .toast-icon {
+            font-size: 20px;
+        }
+
+        .toast-success {
+            border-left-color: #28a745;
+        }
+
+        .toast-error {
+            border-left-color: #dc3545;
+        }
+
+        .toast-info {
+            border-left-color: #17a2b8;
+        }
+
+        .toast-warning {
+            border-left-color: #ffc107;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 700;
+            font-size: 14px;
+            display: block;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .toast-message {
+            font-size: 13px;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toast-container"></div>
+    <!-- HEADER BAR -->
+    <div class="header-bar">
+        <!-- LANGUAGE SWITCHER -->
+        <div class="lang-switcher">
+            <button class="lang-btn active" onclick="setLanguage('en')" id="langEN">EN</button>
+            <button class="lang-btn" onclick="setLanguage('ar')" id="langAR">AR</button>
+        </div>
+
+        <!-- DISCLAIMER BANNER -->
+        <div class="disclaimer-banner">
+            <p data-lang-en="This is an <strong>independent community project</strong> and is not affiliated with, authorized, endorsed, or sponsored by <strong>Garena</strong>, <strong>Free Fire</strong>, or any of their subsidiaries."
+                data-lang-ar="هذا <strong>مشروع مجتمعي مستقل</strong> وغير مرتبط أو مرخص أو معتمد أو مدعوم من قِبل <strong>Garena</strong> أو <strong>Free Fire</strong> أو أي من شركاتها التابعة.">
+                This is an <strong>independent community project</strong> and is not affiliated with, authorized,
+                endorsed, or sponsored by <strong>Garena</strong>, <strong>Free Fire</strong>, or any of their
+                subsidiaries.</p>
+        </div>
+    </div>
+
+    <!-- POPUP DE TERMOS DE SERVICO -->
+    <div id="termsOverlay" class="terms-overlay">
+        <div class="terms-popup">
+            <h2 data-lang-en="Terms of Service" data-lang-ar="شروط الخدمة">Terms of Service</h2>
+            <div class="disclaimer">
+                <p data-lang-en="<strong>WARNING:</strong> This private server is NOT affiliated with, endorsed by, or connected to <strong>Garena</strong>, <strong>Free Fire</strong>, or any of their subsidiaries."
+                    data-lang-ar="<strong>تحذير:</strong> هذا الخادم الخاص غير مرتبط أو معتمد أو متصل بـ <strong>Garena</strong> أو <strong>Free Fire</strong> أو أي من شركاتها التابعة.">
+                    <strong>WARNING:</strong> This private server is NOT affiliated with, endorsed by, or connected to
+                    <strong>Garena</strong>, <strong>Free Fire</strong>, or any of their subsidiaries.
+                </p>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="termsCheckbox" onchange="toggleAcceptButton()">
+                <label for="termsCheckbox"
+                    data-lang-en="I have read and agree to the <a href='/terms' target='_blank'>Terms of Service</a> and <a href='/privacy' target='_blank'>Privacy Policy</a>, and I understand that this is an independent project."
+                    data-lang-ar="لقد قرأت ووافقت على <a href='/terms' target='_blank'>شروط الخدمة</a> و<a href='/privacy' target='_blank'>سياسة الخصوصية</a>، وأفهم أن هذا مشروع مستقل.">I
+                    have read and agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a
+                        href="/privacy" target="_blank">Privacy Policy</a>, and I understand that this is an independent
+                    project.</label>
+            </div>
+            <div class="buttons">
+                <button class="btn-decline" onclick="declineTerms()" data-lang-en="Decline"
+                    data-lang-ar="رفض">Decline</button>
+                <button class="btn-accept" id="btnAcceptTerms" disabled="" onclick="acceptTerms()" data-lang-en="Accept"
+                    data-lang-ar="قبول">Accept</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cookieConsent" class="cookie-banner">
+        <p data-lang-en="This site uses essential cookies for security. Required to register."
+            data-lang-ar="يستخدم هذا الموقع ملفات تعريف ارتباط أساسية للأمان. مطلوبة للتسجيل.">This site uses
+            essential cookies for security. Required to register.</p>
+        <button onclick="acceptCookies()" data-lang-en="Accept" data-lang-ar="قبول">Accept</button>
+    </div>
+    <div class="loading-overlay" id="loadingOverlay" data-lang-en="Initializing secure session..."
+        data-lang-ar="جارٍ تهيئة الجلسة الآمنة..." style="display: none;">Initializing secure session...</div>
+
+    <div class="main-content">
+        <div class="register-container">
+            <div class="logo">
+                <img src="images/coldyoursvx.icon.png" alt="BERLUSAR SERVER Logo">
+                <h1>BERLUSAR SERVER</h1>
+            </div>
+            <div class="info-box" data-lang-en="Create your account with <strong>username and password</strong>"
+                data-lang-ar="أنشئ حسابك بـ <strong>اسم المستخدم وكلمة المرور</strong>">Create your account with
+                <strong>username and password</strong>
+            </div>
+            <div class="error-message" id="errorMessage" style="display: none;"></div>
+            <div class="success-message" id="successMessage"></div>
+            <form id="registerForm" class="form-blocked">
+                <div class="form-group">
+                    <label for="username" data-lang-en="Username" data-lang-ar="اسم المستخدم">Username</label>
+                    <input type="text" id="username" name="username" required="" data-placeholder-en="Choose a username"
+                        data-placeholder-ar="اختر اسم مستخدم" placeholder="Choose a username" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="password" data-lang-en="Password" data-lang-ar="كلمة المرور">Password</label>
+                    <input type="password" id="password" name="password" required=""
+                        data-placeholder-en="Create a password" data-placeholder-ar="أنشئ كلمة مرور"
+                        placeholder="Create a password" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword" data-lang-en="Confirm Password"
+                        data-lang-ar="تأكيد كلمة المرور">Confirm
+                        Password</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" required=""
+                        data-placeholder-en="Confirm your password" data-placeholder-ar="أعد كلمة المرور"
+                        placeholder="Confirm your password" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="key" data-lang-en="Access Key" data-lang-ar="مفتاح الوصول">Access Key</label>
+                    <input type="text" id="key" name="key" required="" data-placeholder-en="Enter your access key"
+                        data-placeholder-ar="أدخل مفتاح الوصول" placeholder="Enter your access key" autocomplete="off">
+                    <div style="text-align: right; margin-top: 5px;">
+                        <a href="https://keys-berlusar.vercel.app" target="_blank"
+                            style="color: #5865F2; font-size: 12px; text-decoration: none;"
+                            data-lang-en="Don't have a key? Get one here"
+                            data-lang-ar="ليس لديك مفتاح؟ احصل على واحد من هنا">Don't have a key? Get one here</a>
+                    </div>
+                </div>
+                <div class="captcha-container">
+                    <div class="h-captcha" data-sitekey="94bea0ac-d6dc-45ec-adce-d2fe24f06076" data-theme="dark"
+                        data-size="normal" data-callback="onCaptchaSuccess" data-expired-callback="onCaptchaExpired">
+                    </div>
+                </div>
+                <button type="submit" class="btn-register" id="submitBtn" disabled="" data-lang-en="Register"
+                    data-lang-ar="تسجيل">Register</button>
+                <div class="reload-hint" id="reloadHint" style="display: none;" data-lang-en="Reload to try again"
+                    data-lang-ar="أعد التحميل للمحاولة مجددًا">Reload to try again</div>
+            </form>
+            <div class="footer-text">
+                <a href="/terms.html" target="_blank" data-lang-en="Terms of Service" data-lang-ar="شروط الخدمة">Terms
+                    of Service</a> |
+                <a href="/privacy.html" target="_blank" data-lang-en="Privacy Policy"
+                    data-lang-ar="سياسة الخصوصية">Privacy Policy</a>
+            </div>
+        </div>
+    </div>
+    <script src="js/register.js"></script>
+
+
+</body>
+
+</html>
